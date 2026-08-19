@@ -48,6 +48,16 @@ const userSchema = new mongoose.Schema({
   type: mongoose.Schema.Types.Mixed,
   default: null
 },
+  otpsuspended: {
+    type: Boolean,
+    default: false,
+  },
+  otp: {
+    type: String,
+  },
+  otpExpires: {
+    type: Date,
+  },
     livetrades: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'livetrade',

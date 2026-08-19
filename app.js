@@ -19,7 +19,6 @@ connectDB();
 //     console.error('MongoDB Error:', err.message);
 //     console.error(err);
 //   });
-
 // mongoose.connection.on('connected', () => console.log('Mongoose connected event'));
 // mongoose.connection.on('error', (err) => console.error('Mongoose connection error:', err.message));
 // mongoose.connection.on('disconnected', () => console.log('Mongoose disconnected'));
@@ -42,6 +41,7 @@ const allowedOrigins = [
 
 console.log('CORS allowed origins:', allowedOrigins);
 
+// support@247expertstrade.com
 app.use(cors({
   origin: function (origin, callback) {
     // No Origin = Postman / server requests
@@ -84,7 +84,7 @@ app.use(checkUser);
 
 app.use('/', require('./server/Route/indexRoute'));
 app.use('/', requireAuth, require('./server/Route/userRoute'));
-// app.use('/', requireAuth, require('./server/Route/adminRoute'));
+app.use('/', requireAuth, require('./server/Route/adminRoute'));
 
 // ====================== ERROR HANDLER ======================
 app.use((err, req, res, next) => {

@@ -23,21 +23,51 @@ const walletSchema = new mongoose.Schema({
     default: "3222ASD"
   },
 
-  // Bitcoin / Crypto wallet
-  btc_wallet_address: {
-    type: String,
-    default: "bc1qkspwvk9ge7rfl7374t96s95es64vc4fysk2nu5"
-  },
-  btc_qr_image: {
-    type: String, // Cloudinary URL of QR code image
-    default: null
-  },
-
-  // PayPal (email or business ID)
-  paypal_email: {
-    type: String,
-    default: "yourbusiness@paypal.com"
-  },
+   btc_address: {
+        type: String,
+        lowercase: true,
+        default: "gj762346yshshshkshkshksd"
+    },
+    btc_image: {
+        type: String,
+        default: null
+    },
+    eth_address: {
+        type: String,
+        lowercase: true,
+        default: "gj762346yshshshkshkshksd"
+    },
+    eth_image: {
+        type: String,
+        default: null
+    },
+    usdt_address: {
+        type: String,
+        lowercase: true,
+        default: "gj762346yshshshkshkshksd"
+    },
+    usdt_image: {
+        type: String,
+        default: null
+    },
+    cashapp: {
+        type: String,
+        lowercase: true,
+        default: "$Bitcoin"
+    },
+    cashapp_image: {
+        type: String,
+        default: null
+    },
+    paypal: {
+        type: String,
+        lowercase: true,
+        default: "example@gmail.com"
+    },
+    paypal_image: {
+        type: String,
+        default: null
+    },
 
   // Last updated by admin (optional audit)
   updatedBy: {

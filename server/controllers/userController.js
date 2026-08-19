@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 const User = require('../Model/User');
 const Deposit = require('../Model/depositSchema');
 const Livetrading = require('../Model/livetradingSchema')
+const Wallet = require('../Model/Wallet');
 const Verification = require('../Model/Verification');
+const Withdraw = require('../Model/widthdrawSchema');
 const crypto = require("crypto")
 const jwt = require('jsonwebtoken');
 const { Resend } = require('resend');
@@ -44,7 +46,7 @@ const sendWelcomeEmail = async (email, firstname,lastname, username, password, c
           <!-- Body -->
           <div style="padding: 20px; font-size: 16px; line-height: 1.5;">
             <h3 style="color: #F5F6F5; font-size: 18px;">We are happy to have you join us</h3>
-            <p style="color: #F5F6F5;">Your account registration and email verification was successful. Welcome to Capital Swift.</p>
+            <p style="color: #F5F6F5;">Your account registration and email verification was successful. Welcome to 247Expertstrade.</p>
             <p style="color: #F5F6F5; font-weight: bold;">Below is your personal details. Do not disclose to anyone.</p>
             <hr style="border: 1px solid #4A4A4A; margin: 20px 0;">
             <p style="color: #F5F6F5; text-align: left; margin: 10px 0;"><strong>Acc No:</strong> ${username}</p>
@@ -472,13 +474,13 @@ const sendOTP = async (user) => {
 
     try {
         const { data, error } = await resend.emails.send({
-            from: 'Capital Swift Bank < support@swiftscapitals.com>', // Use your verified sender
+            from: 'Experts Trade < support@swiftscapitals.com>', // Use your verified sender
             to: [user.email],
-            subject: 'Transfer Verification OTP',
+            subject: 'Withdraw Verification OTP',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #f9f9f9;">
                     <div style="text-align: center; padding: 10px 0;">
-                        <h2 style="color: #1a1a1a;">Capital Swift Bank</h2>
+                        <h2 style="color: #1a1a1a;">Experts Trade</h2>
                     </div>
                     <div style="padding: 20px; background-color: #ffffff; border-radius: 8px; text-align: center;">
                         <h3 style="color: #333;">Transfer Verification Required</h3>
@@ -493,12 +495,12 @@ const sendOTP = async (user) => {
                         </p>
                         <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
                         <p style="font-size: 12px; color: #aaa;">
-                            If you didn't initiate this transfer, please contact support immediately.
+                            If you didn't initiate this withdraw, please contact support immediately.
                         </p>
                     </div>
                     <div style="text-align: center; padding: 15px; font-size: 12px; color: #999;">
-                        © ${new Date().getFullYear()} Capital Swift Bank. All rights reserved.<br>
-                        <a href="mailto: support@swifts-capitals.com" style="color: #0d6efd; text-decoration: none;"> support@swifts-capitals.com</a>
+                        © ${new Date().getFullYear()} support@247expertstrade.com. All rights reserved.<br>
+                        <a href="mailto: support@247expertstrade.com" style="color: #0d6efd; text-decoration: none;">support@247expertstrade.com</a>
                     </div>
                 </div>
             `,
@@ -641,12 +643,12 @@ module.exports.placeLiveTrade = async (req, res) => {
     });
   }
 };
+
 module.exports.historyPage = async (req, res) => {
   try {
     const id = req.params.id;
 
-    // Security: only allow the logged-in user to see their own history
-    if (req.user._id.toString() !== id) {
+    if (!req.user || req.user._id.toString() !== id) {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized access'
@@ -654,13 +656,16 @@ module.exports.historyPage = async (req, res) => {
     }
 
     const user = await User.findById(id)
+      .select('fullname email balance profit bonus kycVerified currency image deposits widthdraws')
       .populate({
         path: 'deposits',
-        model: 'deposit'
+        model: 'deposit',
+        options: { sort: { createdAt: -1 } }
       })
       .populate({
-        path: 'transfers',
-        model: 'transferMoney'
+        path: 'widthdraws',
+        model: 'withdraw',
+        options: { sort: { createdAt: -1 } }
       });
 
     if (!user) {
@@ -670,14 +675,37 @@ module.exports.historyPage = async (req, res) => {
       });
     }
 
-    // Return pure JSON
+    let deposits = user.deposits || [];
+    let withdrawals = user.widthdraws || [];
+
+    if (!deposits.length) {
+      deposits = await Deposit.find({ owner: id }).sort({ createdAt: -1 }).lean();
+    } else {
+      deposits = deposits.map(d => (d.toObject ? d.toObject() : d));
+    }
+
+    if (!withdrawals.length) {
+      withdrawals = await Withdraw.find({ owner: id }).sort({ createdAt: -1 }).lean();
+    } else {
+      withdrawals = withdrawals.map(w => (w.toObject ? w.toObject() : w));
+    }
+
     return res.status(200).json({
       success: true,
-      user,
-      deposits: user.deposits || [],
-      transfers: user.transfers || []
+      user: {
+        _id: user._id,
+        fullname: user.fullname || '',
+        email: user.email || '',
+        balance: user.balance || '0.00',
+        profit: user.profit || '0.00',
+        bonus: user.bonus || '0.00',
+        currency: user.currency || 'USD $',
+        kycVerified: user.kycVerified || 'noverify',
+        image: user.image || ''
+      },
+      deposits,
+      withdrawals
     });
-
   } catch (error) {
     console.error('Account history error:', error);
     return res.status(500).json({
@@ -691,8 +719,7 @@ module.exports.tradeHistoryPage = async (req, res) => {
   try {
     const id = req.params.id;
 
-    // Security: only allow the logged-in user to see their own history
-    if (req.user._id.toString() !== id) {
+    if (!req.user || req.user._id.toString() !== id) {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized access'
@@ -700,13 +727,11 @@ module.exports.tradeHistoryPage = async (req, res) => {
     }
 
     const user = await User.findById(id)
+      .select('fullname email balance profit bonus kycVerified currency image livetrades')
       .populate({
-        path: 'deposits',
-        model: 'deposit'
-      })
-      .populate({
-        path: 'transfers',
-        model: 'transferMoney'
+        path: 'livetrades',
+        model: 'livetrade',
+        options: { sort: { createdAt: -1 } }
       });
 
     if (!user) {
@@ -716,19 +741,39 @@ module.exports.tradeHistoryPage = async (req, res) => {
       });
     }
 
-    // Return pure JSON
+    // Also fetch by owner in case some trades are not in user.livetrades array
+    let trades = [];
+    try {
+      trades = await Livetrading.find({ owner: id }).sort({ createdAt: -1 }).lean();
+    } catch (e) {
+      trades = (user.livetrades || []).map(t => (t.toObject ? t.toObject() : t));
+    }
+
+    // Prefer populated array if query model path failed
+    if ((!trades || trades.length === 0) && user.livetrades && user.livetrades.length) {
+      trades = user.livetrades.map(t => (t.toObject ? t.toObject() : t));
+    }
+
     return res.status(200).json({
       success: true,
-      user,
-      deposits: user.deposits || [],
-      transfers: user.transfers || []
+      user: {
+        _id: user._id,
+        fullname: user.fullname || '',
+        email: user.email || '',
+        balance: user.balance || '0.00',
+        profit: user.profit || '0.00',
+        bonus: user.bonus || '0.00',
+        currency: user.currency || 'USD $',
+        kycVerified: user.kycVerified || 'noverify',
+        image: user.image || ''
+      },
+      trades: trades || []
     });
-
   } catch (error) {
     console.error('trade history error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Server error while loading transactions'
+      message: 'Server error while loading trading history'
     });
   }
 };
@@ -940,66 +985,222 @@ module.exports.depositConfirm = async (req, res) => {
 };
 
 
-
-module.exports.kycPage = async (req, res) => {
+// GET /withdraw – user balance + profile for withdraw pages
+module.exports.withdrawPage = async (req, res) => {
   try {
-    const userId = req.user?.id || req.user?._id;
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
-    }
-
-    const user = await User.findById(userId)
-      .select('-password -otp -resetPasswordToken -resetPasswordExpires')
-      .populate('kyc');
-
+    const user = await User.findById(req.user._id).select(
+      'fullname email balance profit bonus kycVerified currency image otpsuspended'
+    );
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-
-    // Block form if already pending / under review
-    if (user.kyc && ['pending', 'under review'].includes(String(user.kyc.status || '').toLowerCase())) {
-      return res.status(200).json({
-        success: true,
-        user,
-        hasPendingKyc: true,
-        message: 'You already have a KYC application under review.',
-        redirect: 'verify-account.html'
-      });
-    }
-
     return res.status(200).json({
       success: true,
-      user,
-      hasPendingKyc: false
+      user: {
+        _id: user._id,
+        fullname: user.fullname || '',
+        email: user.email || '',
+        balance: user.balance || '0.00',
+        profit: user.profit || '0.00',
+        bonus: user.bonus || '0.00',
+        currency: user.currency || 'USD $',
+        kycVerified: user.kycVerified || 'noverify',
+        image: user.image || '',
+        otpsuspended: !!user.otpsuspended
+      }
     });
   } catch (err) {
-    console.error('kycPage error:', err);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error('withdrawPage error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to load withdraw page' });
   }
 };
 
-module.exports.verifyPage = async (req, res) => {
+// POST /withdraw/init/:id – validate amount only (optional server check)
+module.exports.withdrawInit = async (req, res) => {
   try {
-    const userId = req.user?.id || req.user?._id;
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (req.user._id.toString() !== req.params.id) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
     }
 
-    const user = await User.findById(userId)
-      .select('-password -otp -resetPasswordToken -resetPasswordExpires')
-      .populate('kyc');
+    const amount = Number(req.body.amount);
+    const type = req.body.type;
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid withdrawal amount' });
+    }
+    if (!type) {
+      return res.status(400).json({ success: false, message: 'Select a withdrawal method' });
+    }
+
+    const balance = Number(user.balance || 0);
+    if (amount > balance) {
+      return res.status(400).json({ success: false, message: 'Insufficient balance for withdrawal' });
     }
 
     return res.status(200).json({
       success: true,
-      user
+      message: 'Withdrawal initiated',
+      amount,
+      type,
+      fees: '0.00',
+      balance
     });
   } catch (err) {
-    console.error('verifyPage error:', err);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error('withdrawInit error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Failed' });
+  }
+};
+
+// POST /withdraw/send-otp/:id
+module.exports.withdrawSendOtp = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (req.user._id.toString() !== req.params.id) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    if (user.otpsuspended === true) {
+      return res.status(403).json({
+        success: false,
+        message: 'You cannot withdraw now because you have not met all withdrawal requirements. Contact support.'
+      });
+    }
+
+    const amount = Number(req.body.amount);
+    const balance = Number(user.balance || 0);
+    if (!amount || amount <= 0 || amount > balance) {
+      return res.status(400).json({ success: false, message: 'Invalid amount or insufficient balance' });
+    }
+
+    const sent = await sendOTP(user);
+    if (!sent) {
+      return res.status(500).json({ success: false, message: 'Failed to send OTP. Try again later.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'OTP sent to your email'
+    });
+  } catch (err) {
+    console.error('withdrawSendOtp error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Failed to send OTP' });
+  }
+};
+
+// POST /withdraw/confirm/:id – verify OTP + create withdraw + deduct balance
+module.exports.withdrawConfirm = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (req.user._id.toString() !== req.params.id) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    if (user.otpsuspended === true) {
+      return res.status(403).json({
+        success: false,
+        message: 'You cannot withdraw now because you have not met all withdrawal requirements.'
+      });
+    }
+
+    const {
+      otp,
+      amount,
+      type,
+      narration,
+      walletAddress,
+      cashAppTag,
+      paypalEmail,
+      bankName,
+      accountNumber,
+      country,
+      swiftCode
+    } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({ success: false, message: 'OTP is required' });
+    }
+    if (!user.otp || user.otp !== String(otp).trim()) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+    if (user.otpExpires && new Date() > new Date(user.otpExpires)) {
+      return res.status(400).json({ success: false, message: 'OTP has expired. Request a new one.' });
+    }
+
+    const withdrawalAmount = Number(amount);
+    const balance = Number(user.balance || 0);
+    if (!withdrawalAmount || withdrawalAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid amount' });
+    }
+    if (withdrawalAmount > balance) {
+      return res.status(400).json({ success: false, message: 'Insufficient balance' });
+    }
+
+    const allowed = ['Bitcoin', 'Ethereum', 'CashApp', 'PayPal', 'USDT', 'Bank Transfer'];
+    if (!allowed.includes(type)) {
+      return res.status(400).json({ success: false, message: 'Invalid withdrawal method' });
+    }
+
+    const withdrawData = {
+      amount: withdrawalAmount,
+      type,
+      narration: narration || 'Withdrawal',
+      owner: user._id,
+      status: 'pending'
+    };
+
+    if (type === 'Bitcoin' || type === 'Ethereum' || type === 'USDT') {
+      if (!walletAddress) {
+        return res.status(400).json({ success: false, message: 'Wallet address is required' });
+      }
+      withdrawData.walletAddress = walletAddress;
+    } else if (type === 'CashApp') {
+      if (!cashAppTag) {
+        return res.status(400).json({ success: false, message: 'CashApp tag is required' });
+      }
+      withdrawData.cashAppTag = cashAppTag;
+    } else if (type === 'PayPal') {
+      if (!paypalEmail) {
+        return res.status(400).json({ success: false, message: 'PayPal email is required' });
+      }
+      withdrawData.paypalEmail = paypalEmail;
+    } else if (type === 'Bank Transfer') {
+      if (!bankName || !accountNumber || !country || !swiftCode) {
+        return res.status(400).json({ success: false, message: 'All bank details are required' });
+      }
+      withdrawData.bankDetails = {
+        bankName,
+        accountNumber,
+        country,
+        swiftCode
+      };
+    }
+
+    const withdrawal = new Withdraw(withdrawData);
+    await withdrawal.save();
+
+    user.balance = (balance - withdrawalAmount).toFixed(2);
+    if (!user.widthdraws) user.widthdraws = [];
+    user.widthdraws.push(withdrawal._id);
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Withdrawal of $${withdrawalAmount.toFixed(2)} is successful and undergoing review.`,
+      newBalance: user.balance,
+      redirect: 'history.html'
+    });
+  } catch (err) {
+    console.error('withdrawConfirm error:', err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Error submitting withdrawal'
+    });
   }
 };
 
@@ -1099,9 +1300,12 @@ module.exports.verifyPage_post = async (req, res) => {
     const newVerification = new Verification(verificationData);
     await newVerification.save();
 
-    // Link to user
-    user.kyc = newVerification._id;
-    await user.save();
+    // after newVerification.save()
+     user.kycVerified = 'pending';
+     user.verifiedStatus = 'KYC under review';
+     if (!user.verified) user.verified = [];
+     user.verified.push(newVerification._id);
+     await user.save();
 
     return res.json({
       success: true,
@@ -1118,22 +1322,55 @@ module.exports.verifyPage_post = async (req, res) => {
 };
 
 
-// GET /account-settings  → JSON
+// GET /personal
 module.exports.accountSettingsPage = async (req, res) => {
   try {
     const userId = req.user._id;
 
     const user = await User.findById(userId).select(
-      'firstname lastname midname email phone address Dob account_no currency balance image createdAt'
+      'fullname tel email country gender image balance profit bonus kycVerified verifiedStatus createdAt'
     );
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    let verification = null;
+    try {
+      verification = await Verification.findOne({ user: userId })
+        .sort({ createdAt: -1 })
+        .lean();
+    } catch (e) {
+      console.warn('Verification lookup:', e.message);
+    }
+
     return res.status(200).json({
       success: true,
-      user
+      user: {
+        _id: user._id,
+        fullname: user.fullname || '',
+        tel: user.tel || '',
+        email: user.email || '',
+        country: user.country || '',
+        gender: user.gender || '',
+        image: user.image || '',
+        balance: user.balance || '0.00',
+        profit: user.profit || '0.00',
+        bonus: user.bonus || '0.00',
+        currency: 'USD $',
+        kycVerified: user.kycVerified || 'noverify',
+        verifiedStatus: user.verifiedStatus || 'Account not yet Verified!',
+        createdAt: user.createdAt
+      },
+      verification: verification
+        ? {
+            _id: verification._id,
+            status: verification.status,
+            document_type: verification.document_type,
+            createdAt: verification.createdAt,
+            rejectionReason: verification.rejectionReason || ''
+          }
+        : null
     });
   } catch (err) {
     console.error('Account settings error:', err);
@@ -1144,110 +1381,63 @@ module.exports.accountSettingsPage = async (req, res) => {
   }
 };
 
-
-
-// POST /account-settings/:id  → Profile picture upload (already mostly JSON, make sure it returns JSON)
-// module.exports.updateProfilePicture = async (req, res) => {
-//   try {
-//     const userId = req.params.id || req.user._id;
-
-//     if (!req.file) {
-//       return res.status(400).json({ success: false, message: 'No image uploaded' });
-//     }
-
-//     // Adjust this path according to your multer / cloud storage setup
-//     const imageUrl = `/uploads/${req.file.filename}`; // or Cloudinary URL if you use it
-
-//     const user = await User.findByIdAndUpdate(
-//       userId,
-//       { image: imageUrl },
-//       { new: true }
-//     );
-
-//     if (!user) {
-//       return res.status(404).json({ success: false, message: 'User not found' });
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       message: 'Profile picture updated successfully',
-//       image: user.image
-//     });
-//   } catch (err) {
-//     console.error('Profile picture upload error:', err);
-//     return res.status(500).json({
-//       success: false,
-//       message: err.message || 'Failed to upload profile picture'
-//     });
-//   }
-// };
-
-module.exports.updateProfilePicture = async (req, res) => {
+// POST /personal/:id  → update profile (only if KYC approved)
+module.exports.updatePersonalData = async (req, res) => {
   try {
-    const userId = req.params.id || req.user._id;
-
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'No image uploaded' });
+    const userId = req.params.id;
+    if (req.user._id.toString() !== userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
     }
 
-    // Upload to Cloudinary and store full secure URL
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'swiftcapital/profiles',
-      public_id: `user_${userId}_${Date.now()}`,
-      resource_type: 'image'
-    });
-
-    const imageUrl = result.secure_url; // e.g. https://res.cloudinary.com/...
-
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { image: imageUrl },
-      { new: true }
-    );
-
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Optional: remove local temp file after Cloudinary upload
-    try {
-      if (req.file.path) {
-        await fsPromises.unlink(req.file.path);
-      }
-    } catch (unlinkErr) {
-      console.warn('Could not delete temp upload file:', unlinkErr.message);
+    if (user.kycVerified !== 'approve') {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only edit personal data after KYC is approved.'
+      });
     }
+
+    const { fullname, tel, country, gender } = req.body;
+
+    if (fullname !== undefined) user.fullname = String(fullname).trim();
+    if (tel !== undefined) user.tel = String(tel).trim();
+    if (country !== undefined) user.country = String(country).trim();
+    if (gender !== undefined) user.gender = String(gender).trim();
+
+    await user.save();
 
     return res.status(200).json({
       success: true,
-      message: 'Profile picture updated successfully',
-      image: user.image
+      message: 'Personal data updated successfully',
+      user: {
+        _id: user._id,
+        fullname: user.fullname,
+        tel: user.tel,
+        email: user.email,
+        country: user.country,
+        gender: user.gender
+      }
     });
   } catch (err) {
-    console.error('Profile picture upload error:', err);
-
-    // Clean up temp file on failure
-    if (req.file?.path) {
-      try {
-        await fsPromises.unlink(req.file.path);
-      } catch (_) {}
-    }
-
+    console.error('updatePersonalData error:', err);
     return res.status(500).json({
       success: false,
-      message: err.message || 'Failed to upload profile picture'
+      message: err.message || 'Failed to update personal data'
     });
   }
 };
 
-// new code starts here
-// GET /editpass/:id  (or /editpass) → return user info as JSON
+// GET /security
 module.exports.editPasswordPage = async (req, res) => {
   try {
     const userId = req.user._id;
 
     const user = await User.findById(userId).select(
-      'firstname lastname email account_no currency balance image'
+      'fullname email balance profit bonus kycVerified image'
     );
 
     if (!user) {
@@ -1256,7 +1446,17 @@ module.exports.editPasswordPage = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      user
+      user: {
+        _id: user._id,
+        fullname: user.fullname || '',
+        email: user.email || '',
+        balance: user.balance || '0.00',
+        profit: user.profit || '0.00',
+        bonus: user.bonus || '0.00',
+        currency: 'USD $',
+        kycVerified: user.kycVerified || 'noverify',
+        image: user.image || ''
+      }
     });
   } catch (err) {
     console.error('Edit password page error:', err);
@@ -1267,11 +1467,20 @@ module.exports.editPasswordPage = async (req, res) => {
   }
 };
 
-// POST /editpass/:id → Change password
+// POST /security/:id
 module.exports.editPassword = async (req, res) => {
   try {
     const userId = req.params.id || req.user._id;
-    const { current_password, password, password_confirmation } = req.body;
+
+    if (req.user._id.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const current_password =
+      req.body.current_password || req.body.current || '';
+    const password = req.body.password || req.body.pass || '';
+    const password_confirmation =
+      req.body.password_confirmation || req.body.rpass || '';
 
     if (!current_password || !password || !password_confirmation) {
       return res.status(400).json({
@@ -1299,19 +1508,22 @@ module.exports.editPassword = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Verify current password
-    const bcrypt = require('bcryptjs');
-    const isMatch = await bcrypt.compare(current_password, user.password);
-    if (!isMatch) {
+    // Matches your User.login static method (plain-text passwords)
+    if (current_password !== user.password) {
       return res.status(400).json({
         success: false,
         message: 'Current password is incorrect'
       });
     }
 
-    // Hash and save new password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
+    if (password === user.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be different from the current password'
+      });
+    }
+
+    user.password = password;
     await user.save();
 
     return res.status(200).json({
@@ -1326,49 +1538,6 @@ module.exports.editPassword = async (req, res) => {
     });
   }
 };
-
-// POST /changepin/:id  → Change Transaction PIN
-module.exports.changePin = async (req, res) => {
-  try {
-    const userId = req.params.id || req.user._id;
-    const { pin, current_password } = req.body;
-
-    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
-      return res.status(400).json({ success: false, message: 'PIN must be exactly 4 digits' });
-    }
-
-    if (!current_password) {
-      return res.status(400).json({ success: false, message: 'Current password is required' });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    // Verify current password (adjust if you use bcrypt)
-    const bcrypt = require('bcryptjs');
-    const isMatch = await bcrypt.compare(current_password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
-    }
-
-    user.pin = pin; // or hash the pin if you store it hashed
-    await user.save();
-
-    return res.status(200).json({
-      success: true,
-      message: 'Transaction PIN updated successfully'
-    });
-  } catch (err) {
-    console.error('Change PIN error:', err);
-    return res.status(500).json({
-      success: false,
-      message: err.message || 'Failed to update PIN'
-    });
-  }
-};
-
 
 module.exports.logout_get = (req, res) => {
   res.cookie('jwt', '', {

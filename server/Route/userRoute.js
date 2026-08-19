@@ -19,29 +19,26 @@ const upload = multer({ storage });
 
 router.get('/dashboard',userController.dashboardPage);
 
-router.get('/accounthistory/:id',userController.historyPage);
+router.get('/history/:id',userController.historyPage);
 router.get('/trade-history/:id',userController.tradeHistoryPage);
 
 router.post('/livetrade', upload.none(), userController.placeLiveTrade);
 
-router.get('/account-settings',userController.accountSettingsPage);
-router.post('/account-settings/:id', upload.single('image'), userController.updateProfilePicture);
-router.get('/editpass/:id',userController.editPasswordPage);
-router.post('/editpass/:id',userController.editPassword);
-router.post('/changepin/:id', userController.changePin);
+router.get('/personal', userController.accountSettingsPage);
+router.post('/personal/:id', upload.none(), userController.updatePersonalData);
 
-// kyc route
-router.get('/kyc-form',userController.kycPage);
-router.get('/verify-account',userController.verifyPage);
 router.post(
   '/verify-account/:id',
   upload.fields([
     { name: 'frontimg', maxCount: 1 },
-    { name: 'backimg',  maxCount: 1 },
-    { name: 'photo',    maxCount: 1 }
+    { name: 'backimg', maxCount: 1 },
+    { name: 'photo', maxCount: 1 }
   ]),
   userController.verifyPage_post
 );
+
+router.get('/security', userController.editPasswordPage);
+router.post('/security/:id', userController.editPassword);
 
 
 // ====================== DEPOSIT FLOW ======================
@@ -56,8 +53,10 @@ router.get('/payment/:id', userController.paymentPage);
 router.post('/deposit/confirm/:id', upload.single('image'), userController.depositConfirm);
 
 
-
-
+router.get('/withdraw', userController.withdrawPage);
+router.post('/withdraw/init/:id', userController.withdrawInit);
+router.post('/withdraw/send-otp/:id', userController.withdrawSendOtp);
+router.post('/withdraw/confirm/:id', userController.withdrawConfirm);
 
 module.exports = router;
 
