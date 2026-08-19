@@ -67,12 +67,25 @@ router.post('/withdrawals-delete/:id', adminController.deleteWithdrawal);
 router.get('/wallets', adminController.allWalletPage);
 router.get('/viewWallet/:id', adminController.viewWallet);
 router.get('/editWallet/:id', adminController.editWallet);
-router.put('/editWallet/:id', upload.single('btc_qr_image'), adminController.editWallet_post);
+router.post('/edit-wallet/:id', upload.fields([
+  { name: 'btc_image', maxCount: 1 },
+  { name: 'eth_image', maxCount: 1 },
+  { name: 'usdt_image', maxCount: 1 },
+  { name: 'cashapp_image', maxCount: 1 },
+  { name: 'paypal_image', maxCount: 1 },
+]), adminController.updateWallet);
 router.delete('/deleteWallet/:id', adminController.deleteWallet);
 
 // New: Add wallet with image upload
 router.get('/addWallet', adminController.addWalletPage);
-router.post('/addWallet', upload.single('btc_qr_image'), adminController.addWallet_post);
+router.post('/add-wallet', upload.fields([
+  { name: 'btc_image', maxCount: 1 },
+  { name: 'eth_image', maxCount: 1 },
+  { name: 'usdt_image', maxCount: 1 },
+  { name: 'cashapp_image', maxCount: 1 },
+  { name: 'paypal_image', maxCount: 1 },
+]), adminController.addWallet_post);
+
 
 
 // //************************************* */ All verify routes**********************//
