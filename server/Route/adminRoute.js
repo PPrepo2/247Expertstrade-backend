@@ -73,7 +73,7 @@ router.post('/edit-wallet/:id', upload.fields([
   { name: 'usdt_image', maxCount: 1 },
   { name: 'cashapp_image', maxCount: 1 },
   { name: 'paypal_image', maxCount: 1 },
-]), adminController.updateWallet);
+]), adminController.editWallet_post);
 router.delete('/deleteWallet/:id', adminController.deleteWallet);
 
 // New: Add wallet with image upload
