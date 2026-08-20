@@ -1171,16 +1171,23 @@ module.exports.allWalletPage = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      wallets: wallets.map(w => ({
+      wallets: wallets.map((w) => ({
         _id: w._id,
         bank_name: w.bank_name || '',
         account_name: w.account_name || '',
         account_no: w.account_no || '',
         sortcode: w.sortcode || '',
         swift_code: w.swift_code || '',
-        btc_wallet_address: w.btc_wallet_address || '',
-        btc_qr_image: w.btc_qr_image || null,
-        paypal_email: w.paypal_email || '',
+        btc_address: w.btc_address || '',
+        btc_image: w.btc_image || null,
+        eth_address: w.eth_address || '',
+        eth_image: w.eth_image || null,
+        usdt_address: w.usdt_address || '',
+        usdt_image: w.usdt_image || null,
+        cashapp: w.cashapp || '',
+        cashapp_image: w.cashapp_image || null,
+        paypal: w.paypal || '',
+        paypal_image: w.paypal_image || null,
         updatedBy: w.updatedBy
           ? {
               _id: w.updatedBy._id,
@@ -1206,124 +1213,128 @@ module.exports.allWalletPage = async (req, res) => {
   }
 };
 
-
 module.exports.viewWallet = async (req, res) => {
   try {
     const wallet = await Wallet.findById(req.params.id)
-      .populate('updatedBy', 'firstname lastname email')
+      .populate({
+        path: 'updatedBy',
+        model: 'User',
+        select: 'fullname email'
+      })
       .lean();
 
     if (!wallet) {
-      return res.status(404).json({
-        success: false,
-        message: 'Wallet not found'
-      });
+      return res.status(404).json({ success: false, message: 'Wallet not found' });
     }
 
     return res.status(200).json({
       success: true,
-      wallet,
-      admin: req.user
-        ? {
-            _id: req.user._id,
-            firstname: req.user.firstname,
-            midname: req.user.midname,
-            lastname: req.user.lastname,
-            email: req.user.email,
-            image: req.user.image
-          }
-        : null
+      wallet: {
+        _id: wallet._id,
+        bank_name: wallet.bank_name || '',
+        account_name: wallet.account_name || '',
+        account_no: wallet.account_no || '',
+        sortcode: wallet.sortcode || '',
+        swift_code: wallet.swift_code || '',
+        btc_address: wallet.btc_address || '',
+        btc_image: wallet.btc_image || null,
+        eth_address: wallet.eth_address || '',
+        eth_image: wallet.eth_image || null,
+        usdt_address: wallet.usdt_address || '',
+        usdt_image: wallet.usdt_image || null,
+        cashapp: wallet.cashapp || '',
+        cashapp_image: wallet.cashapp_image || null,
+        paypal: wallet.paypal || '',
+        paypal_image: wallet.paypal_image || null,
+        updatedBy: wallet.updatedBy || null,
+        createdAt: wallet.createdAt,
+        updatedAt: wallet.updatedAt
+      },
+      admin: {
+        _id: req.user._id,
+        fullname: req.user.fullname || '',
+        email: req.user.email || ''
+      }
     });
   } catch (error) {
     console.error('viewWallet error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
 module.exports.editWallet = async (req, res) => {
   try {
     const wallet = await Wallet.findById(req.params.id).lean();
-
     if (!wallet) {
-      return res.status(404).json({
-        success: false,
-        message: 'Wallet not found'
-      });
+      return res.status(404).json({ success: false, message: 'Wallet not found' });
     }
-
     return res.status(200).json({
       success: true,
       wallet,
-      admin: req.user
-        ? {
-            _id: req.user._id,
-            firstname: req.user.firstname,
-            midname: req.user.midname,
-            lastname: req.user.lastname,
-            email: req.user.email,
-            image: req.user.image
-          }
-        : null
+      admin: {
+        _id: req.user._id,
+        fullname: req.user.fullname || '',
+        email: req.user.email || ''
+      }
     });
   } catch (error) {
     console.error('editWallet error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
-
-module.exports.editWallet_post = async (req, res) => {
+// POST /edit-wallet/:id  (multipart — matches upload.fields)
+module.exports.updateWallet = async (req, res) => {
   try {
-    // 1. First, check if the wallet exists
     const existingWallet = await Wallet.findById(req.params.id);
-    
     if (!existingWallet) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Wallet not found' 
-      });
+      return res.status(404).json({ success: false, message: 'Wallet not found' });
     }
 
-    // 2. Prepare the update data
     const updateData = {
-      bank_name: req.body.bank_name,
-      account_name: req.body.account_name,
-      account_no: req.body.account_no,
-      sortcode: req.body.sortcode,
-      swift_code: req.body.swift_code,
-      btc_wallet_address: req.body.btc_wallet_address,
-      paypal_email: req.body.paypal_email,
-      updatedBy: req.user._id, // assuming req.user from auth middleware
-      updatedAt: Date.now()
+      bank_name: req.body.bank_name !== undefined ? req.body.bank_name : existingWallet.bank_name,
+      account_name: req.body.account_name !== undefined ? req.body.account_name : existingWallet.account_name,
+      account_no: req.body.account_no !== undefined ? req.body.account_no : existingWallet.account_no,
+      sortcode: req.body.sortcode !== undefined ? req.body.sortcode : existingWallet.sortcode,
+      swift_code: req.body.swift_code !== undefined ? req.body.swift_code : existingWallet.swift_code,
+      btc_address: req.body.btc_address !== undefined ? req.body.btc_address : existingWallet.btc_address,
+      eth_address: req.body.eth_address !== undefined ? req.body.eth_address : existingWallet.eth_address,
+      usdt_address: req.body.usdt_address !== undefined ? req.body.usdt_address : existingWallet.usdt_address,
+      cashapp: req.body.cashapp !== undefined ? req.body.cashapp : existingWallet.cashapp,
+      paypal: req.body.paypal !== undefined ? req.body.paypal : existingWallet.paypal,
+      updatedBy: req.user._id
     };
 
-    // 3. If a new QR image was uploaded, update it
-    if (req.file) {
-      updateData.btc_qr_image = req.file.path; // Cloudinary URL
+    const files = req.files || {};
+    if (files.btc_image && files.btc_image[0]) {
+      updateData.btc_image = files.btc_image[0].path || files.btc_image[0].secure_url || files.btc_image[0].url;
+    }
+    if (files.eth_image && files.eth_image[0]) {
+      updateData.eth_image = files.eth_image[0].path || files.eth_image[0].secure_url || files.eth_image[0].url;
+    }
+    if (files.usdt_image && files.usdt_image[0]) {
+      updateData.usdt_image = files.usdt_image[0].path || files.usdt_image[0].secure_url || files.usdt_image[0].url;
+    }
+    if (files.cashapp_image && files.cashapp_image[0]) {
+      updateData.cashapp_image = files.cashapp_image[0].path || files.cashapp_image[0].secure_url || files.cashapp_image[0].url;
+    }
+    if (files.paypal_image && files.paypal_image[0]) {
+      updateData.paypal_image = files.paypal_image[0].path || files.paypal_image[0].secure_url || files.paypal_image[0].url;
     }
 
-    // 4. Perform the update and get the new document
     const updatedWallet = await Wallet.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true, runValidators: true }
     );
 
-    // 5. Success response
     return res.status(200).json({
       success: true,
       message: 'Wallet updated successfully',
       wallet: updatedWallet
     });
-
   } catch (error) {
-    console.error('Edit wallet error:', error);
+    console.error('updateWallet error:', error);
     return res.status(400).json({
       success: false,
       message: error.message || 'Failed to update wallet'
@@ -1331,16 +1342,13 @@ module.exports.editWallet_post = async (req, res) => {
   }
 };
 
-// POST /delete-wallet/:id
 module.exports.deleteWallet = async (req, res) => {
   try {
     const wallet = await Wallet.findById(req.params.id);
     if (!wallet) {
       return res.status(404).json({ success: false, message: 'Wallet not found' });
     }
-
     await Wallet.deleteOne({ _id: wallet._id });
-
     return res.status(200).json({
       success: true,
       message: 'Wallet deleted successfully'
@@ -1351,48 +1359,53 @@ module.exports.deleteWallet = async (req, res) => {
   }
 };
 
-// ────────────────────────────────────────────────
-// NEW: Add Wallet Page & Post
-// ────────────────────────────────────────────────
-
 module.exports.addWalletPage = async (req, res) => {
   try {
     return res.status(200).json({
       success: true,
-      admin: req.user
-        ? {
-            _id: req.user._id,
-            firstname: req.user.firstname,
-            midname: req.user.midname,
-            lastname: req.user.lastname,
-            email: req.user.email,
-            image: req.user.image
-          }
-        : null
+      admin: {
+        _id: req.user._id,
+        fullname: req.user.fullname || '',
+        email: req.user.email || ''
+      }
     });
   } catch (error) {
     console.error('addWalletPage error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
-
-
+// POST /add-wallet
 module.exports.addWallet_post = async (req, res) => {
   try {
+    const files = req.files || {};
     const walletData = {
-      bank_name: req.body.bank_name,
-      account_name: req.body.account_name,
-      account_no: req.body.account_no,
-      sortcode: req.body.sortcode,
-      swift_code: req.body.swift_code,
-      btc_wallet_address: req.body.btc_wallet_address,
-      paypal_email: req.body.paypal_email,
+      bank_name: req.body.bank_name || '',
+      account_name: req.body.account_name || '',
+      account_no: req.body.account_no || '',
+      sortcode: req.body.sortcode || '',
+      swift_code: req.body.swift_code || '',
+      btc_address: req.body.btc_address || '',
+      eth_address: req.body.eth_address || '',
+      usdt_address: req.body.usdt_address || '',
+      cashapp: req.body.cashapp || '',
+      paypal: req.body.paypal || '',
       updatedBy: req.user._id,
-      btc_qr_image: req.file ? req.file.path : null // Cloudinary URL
+      btc_image: files.btc_image && files.btc_image[0]
+        ? (files.btc_image[0].path || files.btc_image[0].secure_url || files.btc_image[0].url)
+        : null,
+      eth_image: files.eth_image && files.eth_image[0]
+        ? (files.eth_image[0].path || files.eth_image[0].secure_url || files.eth_image[0].url)
+        : null,
+      usdt_image: files.usdt_image && files.usdt_image[0]
+        ? (files.usdt_image[0].path || files.usdt_image[0].secure_url || files.usdt_image[0].url)
+        : null,
+      cashapp_image: files.cashapp_image && files.cashapp_image[0]
+        ? (files.cashapp_image[0].path || files.cashapp_image[0].secure_url || files.cashapp_image[0].url)
+        : null,
+      paypal_image: files.paypal_image && files.paypal_image[0]
+        ? (files.paypal_image[0].path || files.paypal_image[0].secure_url || files.paypal_image[0].url)
+        : null
     };
 
     const newWallet = await Wallet.create(walletData);
@@ -1410,7 +1423,6 @@ module.exports.addWallet_post = async (req, res) => {
     });
   }
 };
-
 
 // ********************************* KYC VERIFICATIONS *********************************
 

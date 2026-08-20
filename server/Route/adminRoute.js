@@ -73,8 +73,7 @@ router.post('/edit-wallet/:id', upload.fields([
   { name: 'usdt_image', maxCount: 1 },
   { name: 'cashapp_image', maxCount: 1 },
   { name: 'paypal_image', maxCount: 1 },
-]), adminController.editWallet_post);
-router.delete('/deleteWallet/:id', adminController.deleteWallet);
+]), adminController.updateWallet);
 
 // New: Add wallet with image upload
 router.get('/addWallet', adminController.addWalletPage);
@@ -86,7 +85,7 @@ router.post('/add-wallet', upload.fields([
   { name: 'paypal_image', maxCount: 1 },
 ]), adminController.addWallet_post);
 
-
+router.delete('/deleteWallet/:id', adminController.deleteWallet);
 
 // //************************************* */ All verify routes**********************//
 // KYC Verification Routes (same structure as deposits)
