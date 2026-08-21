@@ -893,7 +893,7 @@ module.exports.paymentPage = async (req, res) => {
       console.warn('Could not load wallet:', e.message);
     }
 
-    return res.status(200).json({
+       return res.status(200).json({
       success: true,
       user: {
         _id: user._id,
@@ -903,7 +903,7 @@ module.exports.paymentPage = async (req, res) => {
         balance: Number(user.balance || 0),
         profit: Number(user.profit || 0),
         bonus: Number(user.bonus || 0),
-        kycVerified: user.kycVerified || false
+        kycVerified: user.kycVerified || 'noverify'
       },
       amount: pending.amount,
       payment_method: pending.payment_method,
@@ -913,9 +913,16 @@ module.exports.paymentPage = async (req, res) => {
         account_no: wallet.account_no || '',
         sortcode: wallet.sortcode || '',
         swift_code: wallet.swift_code || '',
-        btc_wallet_address: wallet.btc_wallet_address || '',
-        btc_qr_image: wallet.btc_qr_image || '',
-        paypal_email: wallet.paypal_email || ''
+        btc_address: wallet.btc_address || '',
+        btc_image: wallet.btc_image || '',
+        eth_address: wallet.eth_address || '',
+        eth_image: wallet.eth_image || '',
+        usdt_address: wallet.usdt_address || '',
+        usdt_image: wallet.usdt_image || '',
+        cashapp: wallet.cashapp || '',
+        cashapp_image: wallet.cashapp_image || '',
+        paypal: wallet.paypal || '',
+        paypal_image: wallet.paypal_image || ''
       }
     });
   } catch (err) {
